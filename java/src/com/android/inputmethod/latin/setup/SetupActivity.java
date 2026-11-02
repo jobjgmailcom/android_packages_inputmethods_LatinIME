@@ -18,19 +18,43 @@ package com.android.inputmethod.latin.setup;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.view.inputmethod.InputMethodInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.os.Bundle;
+
+import com.android.inputmethod.latin.settings.SettingsActivity;
 
 public final class SetupActivity extends Activity {
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         final Intent intent = new Intent();
-        intent.setClass(this, SetupWizardActivity.class);
+        if (isKeyboardEnabled()) {
+            intent.setClass(this, SettingsActivity.class);
+            intent.putExtra(SettingsActivity.EXTRA_ENTRY_KEY,
+                    SettingsActivity.EXTRA_ENTRY_VALUE_APP_ICON);
+        } else {
+            intent.setClass(this, SetupWizardActivity.class);
+        }
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP
                 | Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(intent);
         if (!isFinishing()) {
             finish();
         }
+    }
+
+    private boolean isKeyboardEnabled() {
+        final InputMethodManager inputMethodManager =
+                (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
+        if (inputMethodManager == null) {
+            return false;
+        }
+        for (final InputMethodInfo inputMethod : inputMethodManager.getEnabledInputMethodList()) {
+            if (getPackageName().equals(inputMethod.getPackageName())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -1809,6 +1809,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             final SettingsValues settingsValues) {
         final InputAttributes attributes = settingsValues.mInputAttributes;
         if (mClipboardManager == null || !attributes.mShouldShowSuggestions
+                || !PreferenceManager.getDefaultSharedPreferences(this).getBoolean(
+                        Settings.PREF_CLIPBOARD_SUGGESTIONS, true)
                 || !attributes.mIsGeneralTextInput || attributes.mIsPasswordField
                 || attributes.mNoPersonalizedLearning || suggestions.mTypedWordInfo != null
                 || suggestions.isPunctuationSuggestions()

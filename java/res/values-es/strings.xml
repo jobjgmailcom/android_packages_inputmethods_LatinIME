@@ -209,4 +209,12 @@
     <string name="user_dict_settings_more_languages" msgid="4436784162689712198">"Más idiomas…"</string>
     <string name="user_dict_settings_delete" msgid="7688033506773806537">"Eliminar"</string>
     <string name="user_dict_fast_scroll_alphabet" msgid="6814045626833403178">" ABCDEFGHIJKLMNÑOPQRSTUVWXYZ"</string>
+    <string name="import_personal_dictionary">Importar archivo de diccionario</string>
+    <string name="import_personal_dictionary_summary">Importa listas UTF-8 .txt, .csv o .tsv, una entrada por línea</string>
+    <string name="import_dictionary_result">Se importaron %1$d palabras</string>
+    <string name="import_dictionary_failed">No se pudo importar el archivo. Comprueba que sea una lista de palabras de texto y que Android permita acceder al diccionario.</string>
+    <string name="import_dictionary_empty">No se encontraron palabras válidas en el archivo.</string>
+    <string name="clipboard_suggestions">Sugerir texto copiado</string>
+    <string name="clipboard_suggestions_summary">Mostrar lo último que copiaste como sugerencia para pegar en la barra del teclado</string>
+    <string name="prefs_keyboard_height_scale_summary">Ajusta la altura del teclado del 50 % al 150 %</string>
 </resources>

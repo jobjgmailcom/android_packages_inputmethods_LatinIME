@@ -58,11 +58,6 @@
         android:title="@string/backspace_trackpad"
         android:summary="@string/backspace_trackpad_summary"
         android:defaultValue="true" />
-    <com.android.inputmethod.latin.settings.SeekBarDialogPreference
-        android:key="pref_keyboard_height_scale"
-        android:title="@string/prefs_keyboard_height_scale"
-        latin:minValue="50"
-        latin:maxValue="120" /> <!-- percentage -->
     <Preference
         android:fragment="com.android.inputmethod.latin.settings.DebugSettingsFragment"
         android:key="screen_debug"

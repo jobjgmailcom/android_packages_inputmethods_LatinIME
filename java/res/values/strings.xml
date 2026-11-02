@@ -458,6 +458,13 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="user_dictionaries">User dictionaries</string>
     <!-- Name for the "user dictionary" preference item when there is only one -->
     <string name="default_user_dict_pref_name">User dictionary</string>
+    <string name="import_personal_dictionary">Import dictionary file</string>
+    <string name="import_personal_dictionary_summary">Import UTF-8 .txt, .csv, or .tsv word lists; one entry per line</string>
+    <string name="import_dictionary_result">Imported %1$d words</string>
+    <string name="import_dictionary_failed">Could not import this file. Check that it is a text word list and that Android allows dictionary access.</string>
+    <string name="import_dictionary_empty">No valid words were found in this file.</string>
+    <string name="clipboard_suggestions">Suggest copied text</string>
+    <string name="clipboard_suggestions_summary">Show the latest copied text as a paste suggestion in the keyboard bar</string>
     <!-- Message about some dictionary indicating it can be downloaded, but hasn't been yet -->
     <string name="dictionary_available">Dictionary available</string>
     <!-- Message about some dictionary indicating it is downloading and should be available soon -->

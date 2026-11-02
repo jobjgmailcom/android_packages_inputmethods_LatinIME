@@ -25,6 +25,16 @@
         <intent android:action="android.settings.USER_DICTIONARY_SETTINGS" />
     </Preference>
     <Preference
+        android:key="pref_import_personal_dictionary"
+        android:title="@string/import_personal_dictionary"
+        android:summary="@string/import_personal_dictionary_summary" />
+    <SwitchPreferenceCompat
+        android:key="pref_clipboard_suggestions"
+        android:title="@string/clipboard_suggestions"
+        android:summary="@string/clipboard_suggestions_summary"
+        android:defaultValue="true"
+        android:persistent="true" />
+    <Preference
         android:key="configure_dictionaries_key"
         android:title="@string/configure_dictionaries_title">
         <intent

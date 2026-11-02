@@ -16,7 +16,10 @@
 
 package com.android.inputmethod.latin.settings;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
+
+import java.util.Locale;
 
 import com.android.inputmethod.latin.R;
 import com.android.inputmethod.latin.common.Constants;
@@ -30,6 +33,7 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
     public void onCreate(final Bundle icicle) {
         super.onCreate(icicle);
         addPreferencesFromResource(R.xml.prefs_screen_appearance);
+        setupKeyboardHeight();
         if (!ProductionFlags.IS_SPLIT_KEYBOARD_SUPPORTED ||
                 Constants.isPhone(Settings.readScreenMetrics(getResources()))) {
             removePreference(Settings.PREF_ENABLE_SPLIT_KEYBOARD);
@@ -43,5 +47,48 @@ public final class AppearanceSettingsFragment extends SubScreenFragment {
         CustomInputStyleSettingsFragment.updateCustomInputStylesSummary(
                 findPreference(Settings.PREF_CUSTOM_INPUT_STYLES));
         ThemeSettingsFragment.updateKeyboardThemeSummary(findPreference(Settings.SCREEN_THEME));
+    }
+
+    private void setupKeyboardHeight() {
+        final SharedPreferences prefs = getSharedPreferences();
+        final SeekBarDialogPreference pref = (SeekBarDialogPreference)findPreference(
+                Settings.PREF_KEYBOARD_HEIGHT_SCALE);
+        if (pref == null) {
+            return;
+        }
+        final float defaultValue = SettingsValues.DEFAULT_SIZE_SCALE;
+        pref.setInterface(new SeekBarDialogPreference.ValueProxy() {
+            private int toPercent(final float value) {
+                return Math.round(value * 100.0f);
+            }
+
+            @Override
+            public void writeValue(final int value, final String key) {
+                prefs.edit().putFloat(key, value / 100.0f).apply();
+            }
+
+            @Override
+            public void writeDefaultValue(final String key) {
+                prefs.edit().remove(key).apply();
+            }
+
+            @Override
+            public int readValue(final String key) {
+                return toPercent(Settings.readKeyboardHeight(prefs, defaultValue));
+            }
+
+            @Override
+            public int readDefaultValue(final String key) {
+                return toPercent(defaultValue);
+            }
+
+            @Override
+            public String getValueText(final int value) {
+                return String.format(Locale.ROOT, "%d%%", value);
+            }
+
+            @Override
+            public void feedbackValue(final int value) {}
+        });
     }
 }
