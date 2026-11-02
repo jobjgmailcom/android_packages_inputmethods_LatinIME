@@ -26,6 +26,9 @@ import android.Manifest.permission;
 import android.app.ActivityOptions;
 import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.ClipDescription;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
@@ -219,6 +222,15 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private GestureConsumer mGestureConsumer = GestureConsumer.NULL_GESTURE_CONSUMER;
 
     public final UIHandler mHandler = new UIHandler(this);
+    private ClipboardManager mClipboardManager;
+    private boolean mClipboardListenerRegistered;
+    private final ClipboardManager.OnPrimaryClipChangedListener mClipboardListener =
+            new ClipboardManager.OnPrimaryClipChangedListener() {
+        @Override
+        public void onPrimaryClipChanged() {
+            mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+        }
+    };
 
     public static final class UIHandler extends LeakGuardHandlerWrapper<LatinIME> {
         private static final int MSG_UPDATE_SHIFT_STATE = 0;
@@ -903,6 +915,13 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onStartInputView(final EditorInfo editorInfo, final boolean restarting) {
+        if (mClipboardManager == null) {
+            mClipboardManager = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        }
+        if (mClipboardManager != null && !mClipboardListenerRegistered) {
+            mClipboardManager.addPrimaryClipChangedListener(mClipboardListener);
+            mClipboardListenerRegistered = true;
+        }
         mHandler.onStartInputView(editorInfo, restarting);
         mStatsUtilsManager.onStartInputView();
     }
@@ -910,6 +929,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void onFinishInputView(final boolean finishingInput) {
         StatsUtils.onFinishInputView();
+        if (mClipboardManager != null && mClipboardListenerRegistered) {
+            mClipboardManager.removePrimaryClipChangedListener(mClipboardListener);
+            mClipboardListenerRegistered = false;
+        }
         mHandler.onFinishInputView(finishingInput);
         mStatsUtilsManager.onFinishInputView();
         mGestureConsumer = GestureConsumer.NULL_GESTURE_CONSUMER;
@@ -1776,8 +1799,62 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
                 || currentSettingsValues.isApplicationSpecifiedCompletionsOn()
                 // We should clear the contextual strip if there is no suggestion from dictionaries.
                 || noSuggestionsFromDictionaries) {
-            mSuggestionStripView.setSuggestions(suggestedWords,
+            mSuggestionStripView.setSuggestions(addClipboardSuggestionIfAvailable(
+                    suggestedWords, currentSettingsValues),
                     mRichImm.getCurrentSubtype().isRtlSubtype());
+        }
+    }
+    /** Adds a transient paste candidate without retaining clipboard text or learning it. */
+    private SuggestedWords addClipboardSuggestionIfAvailable(final SuggestedWords suggestions,
+            final SettingsValues settingsValues) {
+        final InputAttributes attributes = settingsValues.mInputAttributes;
+        if (mClipboardManager == null || !attributes.mShouldShowSuggestions
+                || !attributes.mIsGeneralTextInput || attributes.mIsPasswordField
+                || attributes.mNoPersonalizedLearning || suggestions.mTypedWordInfo != null
+                || suggestions.isPunctuationSuggestions()
+                || settingsValues.isApplicationSpecifiedCompletionsOn()) {
+            return suggestions;
+        }
+        try {
+            final ClipData clip = mClipboardManager.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) {
+                return suggestions;
+            }
+            final ClipDescription description = clip.getDescription();
+            if (description == null || !description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+                return suggestions;
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && description.getExtras() != null
+                    && description.getExtras().getBoolean(ClipDescription.EXTRA_IS_SENSITIVE,
+                            false)) {
+                return suggestions;
+            }
+            final CharSequence clipText = clip.getItemAt(0).getText();
+            if (clipText == null || clipText.length() == 0 || clipText.length() > 2000) {
+                return suggestions;
+            }
+            final String text = clipText.toString();
+            for (int i = 0; i < suggestions.size(); i++) {
+                if (text.contentEquals(suggestions.getWord(i))) {
+                    return suggestions;
+                }
+            }
+            final ArrayList<SuggestedWordInfo> words = new ArrayList<>();
+            words.add(new SuggestedWordInfo(text, "", SuggestedWordInfo.MAX_SCORE,
+                    SuggestedWordInfo.KIND_CLIPBOARD, null, SuggestedWordInfo.NOT_AN_INDEX,
+                    SuggestedWordInfo.NOT_A_CONFIDENCE));
+            for (int i = 0; i < suggestions.size(); i++) {
+                words.add(suggestions.getInfo(i));
+            }
+            return new SuggestedWords(words, suggestions.mRawSuggestions,
+                    suggestions.mTypedWordInfo, suggestions.mTypedWordValid,
+                    suggestions.mWillAutoCorrect, false /* isObsoleteSuggestions */,
+                    suggestions.isPrediction() ? suggestions.mInputStyle
+                            : SuggestedWords.INPUT_STYLE_PREDICTION,
+                    suggestions.mSequenceNumber);
+        } catch (final SecurityException e) {
+            // Clipboard access may be denied by the system or the current editor.
+            return suggestions;
         }
     }
 
@@ -1809,6 +1886,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     // interface
     @Override
     public void pickSuggestionManually(final SuggestedWordInfo suggestionInfo) {
+        if (suggestionInfo.getKind() == SuggestedWordInfo.KIND_CLIPBOARD) {
+            onCodeInput(Constants.CODE_CLIPBOARD_PASTE, 0, 0, false /* isKeyRepeat */);
+            return;
+        }
         final InputTransaction completeInputTransaction = mInputLogic.onPickSuggestionManually(
                 mSettings.getCurrent(), suggestionInfo,
                 mKeyboardSwitcher.getKeyboardShiftMode(),
