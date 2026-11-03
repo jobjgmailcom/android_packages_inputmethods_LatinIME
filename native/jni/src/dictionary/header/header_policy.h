@@ -31,6 +31,28 @@ namespace latinime {
 
 class HeaderPolicy : public DictionaryHeaderStructurePolicy {
  public:
+    static bool readIsDecayingDict(
+            const DictionaryHeaderStructurePolicy::AttributeMap *const attributes) {
+        const std::vector<int> dictionaryId =
+                HeaderReadWriteUtils::readCodePointVectorAttributeValue(attributes, "dictionary");
+        static const char kUserHistoryDictionaryPrefix[] = "UserHistoryDictionary";
+        const int prefixLength = sizeof(kUserHistoryDictionaryPrefix) - 1;
+        const std::vector<int>::size_type requiredLength =
+                static_cast<std::vector<int>::size_type>(prefixLength);
+        if (dictionaryId.size() >= requiredLength) {
+            bool isUserHistory = true;
+            for (std::vector<int>::size_type i = 0; i < requiredLength; ++i) {
+                if (dictionaryId[i] != static_cast<int>(kUserHistoryDictionaryPrefix[i])) {
+                    isUserHistory = false;
+                    break;
+                }
+            }
+            if (isUserHistory) return false;
+        }
+        return HeaderReadWriteUtils::readBoolAttributeValue(attributes,
+                IS_DECAYING_DICT_KEY, false /* defaultValue */);
+    }
+
     // Reads information from existing dictionary buffer.
     HeaderPolicy(const uint8_t *const dictBuf, const FormatUtils::FORMAT_VERSION formatVersion)
             : mDictFormatVersion(formatVersion),
@@ -40,8 +62,7 @@ class HeaderPolicy : public DictionaryHeaderStructurePolicy {
               mLocale(readLocale()),
               mMultiWordCostMultiplier(readMultipleWordCostMultiplier()),
               mRequiresGermanUmlautProcessing(readRequiresGermanUmlautProcessing()),
-              mIsDecayingDict(HeaderReadWriteUtils::readBoolAttributeValue(&mAttributeMap,
-                      IS_DECAYING_DICT_KEY, false /* defaultValue */)),
+              mIsDecayingDict(readIsDecayingDict(&mAttributeMap)),
               mDate(HeaderReadWriteUtils::readIntAttributeValue(&mAttributeMap,
                       DATE_KEY, TimeKeeper::peekCurrentTime() /* defaultValue */)),
               mLastDecayedTime(HeaderReadWriteUtils::readIntAttributeValue(&mAttributeMap,
@@ -65,8 +86,7 @@ class HeaderPolicy : public DictionaryHeaderStructurePolicy {
                       attributeMap)), mSize(0), mAttributeMap(*attributeMap), mLocale(locale),
               mMultiWordCostMultiplier(readMultipleWordCostMultiplier()),
               mRequiresGermanUmlautProcessing(readRequiresGermanUmlautProcessing()),
-              mIsDecayingDict(HeaderReadWriteUtils::readBoolAttributeValue(&mAttributeMap,
-                      IS_DECAYING_DICT_KEY, false /* defaultValue */)),
+              mIsDecayingDict(readIsDecayingDict(&mAttributeMap)),
               mDate(HeaderReadWriteUtils::readIntAttributeValue(&mAttributeMap,
                       DATE_KEY, TimeKeeper::peekCurrentTime() /* defaultValue */)),
               mLastDecayedTime(HeaderReadWriteUtils::readIntAttributeValue(&mAttributeMap,

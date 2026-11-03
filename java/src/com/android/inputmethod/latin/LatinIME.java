@@ -707,11 +707,8 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     private void refreshPersonalizationDictionarySession(
             final SettingsValues currentSettingsValues) {
-        if (!currentSettingsValues.mUsePersonalizedDicts) {
-            // Remove user history dictionaries.
-            PersonalizationHelper.removeAllUserHistoryDictionaries(this);
-            mDictionaryFacilitator.clearUserHistoryDictionary(this);
-        }
+        // Turning personalized suggestions off only disables their use. Keep learned data on
+        // device so changing a setting never erases the user's history.
     }
 
     // Note that this method is called from a non-UI thread.

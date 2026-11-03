@@ -67,6 +67,35 @@ public class PersonalizationHelper {
         }
     }
 
+    /** Flushes cached histories without closing or deleting them. */
+    public static void flushAllUserHistoryDictionaries() {
+        synchronized (sLangUserHistoryDictCache) {
+            for (final ConcurrentHashMap.Entry<String, SoftReference<UserHistoryDictionary>> entry
+                    : sLangUserHistoryDictCache.entrySet()) {
+                final SoftReference<UserHistoryDictionary> reference = entry.getValue();
+                final UserHistoryDictionary dictionary = reference == null ? null : reference.get();
+                if (dictionary != null) {
+                    dictionary.flushBinaryDictionary();
+                }
+            }
+        }
+    }
+
+    /** Flushes cached histories and closes them without deleting their files. */
+    public static void closeAllUserHistoryDictionariesWithoutDeleting() {
+        synchronized (sLangUserHistoryDictCache) {
+            for (final ConcurrentHashMap.Entry<String, SoftReference<UserHistoryDictionary>> entry
+                    : sLangUserHistoryDictCache.entrySet()) {
+                final SoftReference<UserHistoryDictionary> reference = entry.getValue();
+                final UserHistoryDictionary dictionary = reference == null ? null : reference.get();
+                if (dictionary != null) {
+                    dictionary.flushAndCloseBinaryDictionary();
+                }
+            }
+            sLangUserHistoryDictCache.clear();
+        }
+    }
+
     public static void removeAllUserHistoryDictionaries(final Context context) {
         synchronized (sLangUserHistoryDictCache) {
             for (final ConcurrentHashMap.Entry<String, SoftReference<UserHistoryDictionary>> entry

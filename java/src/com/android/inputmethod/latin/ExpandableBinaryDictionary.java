@@ -649,6 +649,42 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         });
     }
 
+    /** Flushes this dictionary synchronously. Call from a worker thread. */
+    public void flushBinaryDictionary() {
+        mLock.writeLock().lock();
+        try {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary == null) {
+                return;
+            }
+            if (binaryDictionary.needsToRunGC(false /* mindsBlockByGC */)) {
+                binaryDictionary.flushWithGC();
+            } else {
+                binaryDictionary.flush();
+            }
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
+    /** Flushes and closes this dictionary synchronously. Call from a worker thread. */
+    public void flushAndCloseBinaryDictionary() {
+        mLock.writeLock().lock();
+        try {
+            final BinaryDictionary binaryDictionary = getBinaryDictionary();
+            if (binaryDictionary != null) {
+                if (binaryDictionary.needsToRunGC(false /* mindsBlockByGC */)) {
+                    binaryDictionary.flushWithGC();
+                } else {
+                    binaryDictionary.flush();
+                }
+            }
+            closeBinaryDictionary();
+        } finally {
+            mLock.writeLock().unlock();
+        }
+    }
+
     public DictionaryStats getDictionaryStats() {
         reloadDictionaryIfRequired();
         final String dictName = mDictName;

@@ -92,6 +92,11 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
             "pref_key_preview_popup_dismiss_delay";
     public static final String PREF_BIGRAM_PREDICTIONS = "next_word_prediction";
     public static final String PREF_CLIPBOARD_SUGGESTIONS = "pref_clipboard_suggestions";
+    public static final String PREF_PRIORITIZE_LEARNED_WORDS = "prioritize_learned_words";
+    public static final String PREF_LEARNED_WORD_BOOST = "learned_word_boost";
+    public static final String PREF_REQUIRE_LEARNED_CONTEXT = "require_learned_context";
+    public static final String PREF_DISABLE_MULTI_WORD_SUGGESTIONS =
+            "disable_multi_word_suggestions";
     public static final String PREF_GESTURE_INPUT = "gesture_input";
     public static final String PREF_VIBRATION_DURATION_SETTINGS =
             "pref_vibration_duration_settings";

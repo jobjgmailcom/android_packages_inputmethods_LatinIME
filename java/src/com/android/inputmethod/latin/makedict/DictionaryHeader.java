@@ -55,6 +55,7 @@ public final class DictionaryHeader {
     public static final String MAX_BIGRAM_COUNT_KEY = "MAX_BIGRAM_ENTRY_COUNT";
     public static final String MAX_TRIGRAM_COUNT_KEY = "MAX_TRIGRAM_ENTRY_COUNT";
     public static final String ATTRIBUTE_VALUE_TRUE = "1";
+    public static final String ATTRIBUTE_VALUE_FALSE = "0";
     public static final String CODE_POINT_TABLE_KEY = "codePointTable";
 
     public DictionaryHeader(final int headerSize,

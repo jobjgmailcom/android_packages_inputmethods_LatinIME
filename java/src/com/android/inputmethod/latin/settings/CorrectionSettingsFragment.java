@@ -26,6 +26,8 @@ import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import androidx.preference.Preference;
 import androidx.preference.SwitchPreferenceCompat;
 import android.text.TextUtils;
@@ -34,6 +36,7 @@ import android.widget.Toast;
 import com.android.inputmethod.dictionarypack.DictionarySettingsActivity;
 import com.android.inputmethod.latin.R;
 import com.android.inputmethod.compat.UserDictionaryCompatUtils;
+import com.android.inputmethod.latin.personalization.PersonalizationHelper;
 import com.android.inputmethod.latin.permissions.PermissionsManager;
 import com.android.inputmethod.latin.permissions.PermissionsUtil;
 import com.android.inputmethod.latin.userdictionary.UserDictionaryList;
@@ -41,11 +44,18 @@ import com.android.inputmethod.latin.userdictionary.UserDictionarySettings;
 
 import java.util.TreeSet;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 /**
  * "Text correction" settings sub screen.
@@ -71,7 +81,10 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
 
     private SwitchPreferenceCompat mUseContactsPreference;
     private static final int REQUEST_IMPORT_DICTIONARY = 4107;
+    private static final int REQUEST_BACKUP_LEARNED_WORDS = 4108;
+    private static final int REQUEST_RESTORE_LEARNED_WORDS = 4109;
     private static final int MAX_IMPORTED_WORDS = 10000;
+    private static final long MAX_LEARNED_BACKUP_BYTES = 80L * 1024 * 1024;
 
     @Override
     public void onCreate(final Bundle icicle) {
@@ -115,16 +128,186 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
                 return true;
             });
         }
+        final Preference backupLearnedPreference = findPreference("backup_learned_words");
+        if (backupLearnedPreference != null) {
+            backupLearnedPreference.setOnPreferenceClickListener(preference -> {
+                final Intent create = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                create.addCategory(Intent.CATEGORY_OPENABLE);
+                create.setType("application/zip");
+                create.putExtra(Intent.EXTRA_TITLE, "LatinIME-palabras-aprendidas.zip");
+                startActivityForResult(create, REQUEST_BACKUP_LEARNED_WORDS);
+                return true;
+            });
+        }
+        final Preference restoreLearnedPreference = findPreference("restore_learned_words");
+        if (restoreLearnedPreference != null) {
+            restoreLearnedPreference.setOnPreferenceClickListener(preference -> {
+                final Intent open = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                open.addCategory(Intent.CATEGORY_OPENABLE);
+                open.setType("application/zip");
+                startActivityForResult(open, REQUEST_RESTORE_LEARNED_WORDS);
+                return true;
+            });
+        }
     }
 
     @Override
     public void onActivityResult(final int requestCode, final int resultCode, final Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_IMPORT_DICTIONARY || resultCode != Activity.RESULT_OK
-                || data == null || data.getData() == null) {
+        if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) {
             return;
         }
-        importDictionaryFile(data.getData());
+        if (requestCode == REQUEST_IMPORT_DICTIONARY) {
+            importDictionaryFile(data.getData());
+        } else if (requestCode == REQUEST_BACKUP_LEARNED_WORDS) {
+            backupLearnedWords(data.getData());
+        } else if (requestCode == REQUEST_RESTORE_LEARNED_WORDS) {
+            restoreLearnedWords(data.getData());
+        }
+    }
+
+    private void backupLearnedWords(final Uri uri) {
+        final Context context = getActivity().getApplicationContext();
+        new Thread(() -> {
+            int result = R.string.learned_backup_failed;
+            try {
+                PersonalizationHelper.flushAllUserHistoryDictionaries();
+                final File filesDir = context.getFilesDir();
+                final File[] dictionaries = filesDir == null ? null : filesDir.listFiles(
+                        (dir, name) -> name.startsWith("UserHistoryDictionary")
+                                && name.endsWith(".dict"));
+                if (dictionaries == null || dictionaries.length == 0) {
+                    result = R.string.learned_backup_empty;
+                } else {
+                    final OutputStream output = context.getContentResolver().openOutputStream(uri);
+                    if (output == null) throw new IOException("Cannot open backup destination");
+                    try (ZipOutputStream zip = new ZipOutputStream(output)) {
+                        final byte[] buffer = new byte[8192];
+                        long totalBytes = 0;
+                        for (final File dictionary : dictionaries) {
+                            totalBytes += dictionary.length();
+                            if (totalBytes > MAX_LEARNED_BACKUP_BYTES) {
+                                throw new IOException("Learned history backup is too large");
+                            }
+                            zip.putNextEntry(new ZipEntry(dictionary.getName()));
+                            try (InputStream input = new FileInputStream(dictionary)) {
+                                int count;
+                                while ((count = input.read(buffer)) != -1) {
+                                    zip.write(buffer, 0, count);
+                                }
+                            }
+                            zip.closeEntry();
+                        }
+                    }
+                    result = R.string.learned_backup_success;
+                }
+            } catch (final IOException | SecurityException e) {
+                result = R.string.learned_backup_failed;
+            }
+            showBackgroundToast(context, result);
+        }, "LatinIME-learned-backup").start();
+    }
+
+    private void restoreLearnedWords(final Uri uri) {
+        final Context context = getActivity().getApplicationContext();
+        new Thread(() -> {
+            int result = R.string.learned_restore_failed;
+            final File stage = new File(context.getCacheDir(), "learned-history-restore");
+            try {
+                deleteRecursively(stage);
+                if (!stage.mkdirs() && !stage.isDirectory()) {
+                    throw new IOException("Cannot create restore staging directory");
+                }
+                final InputStream input = context.getContentResolver().openInputStream(uri);
+                if (input == null) throw new IOException("Cannot open backup file");
+                int fileCount = 0;
+                long totalBytes = 0;
+                final byte[] buffer = new byte[8192];
+                try (ZipInputStream zip = new ZipInputStream(input)) {
+                    ZipEntry entry;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        if (entry.isDirectory()) continue;
+                        final String name = entry.getName();
+                        final File leaf = new File(name);
+                        if (!name.equals(leaf.getName()) || !name.startsWith("UserHistoryDictionary")
+                                || !name.endsWith(".dict") || name.contains("..")) {
+                            throw new IOException("Invalid learned history entry");
+                        }
+                        if (++fileCount > 64) throw new IOException("Too many dictionary files");
+                        final File stagedFile = new File(stage, name + ".tmp");
+                        try (FileOutputStream output = new FileOutputStream(stagedFile)) {
+                            int count;
+                            while ((count = zip.read(buffer)) != -1) {
+                                totalBytes += count;
+                                if (totalBytes > MAX_LEARNED_BACKUP_BYTES) {
+                                    throw new IOException("Learned history backup is too large");
+                                }
+                                output.write(buffer, 0, count);
+                            }
+                        }
+                        zip.closeEntry();
+                    }
+                }
+                final File[] stagedFiles = stage.listFiles();
+                if (stagedFiles == null || stagedFiles.length == 0) {
+                    result = R.string.learned_restore_empty;
+                } else {
+                    PersonalizationHelper.closeAllUserHistoryDictionariesWithoutDeleting();
+                    final File filesDir = context.getFilesDir();
+                    for (final File stagedFile : stagedFiles) {
+                        final String name = stagedFile.getName().substring(
+                                0, stagedFile.getName().length() - 4);
+                        installStagedDictionary(stagedFile, new File(filesDir, name));
+                    }
+                    result = R.string.learned_restore_success;
+                }
+            } catch (final IOException | SecurityException e) {
+                result = R.string.learned_restore_failed;
+            } finally {
+                deleteRecursively(stage);
+            }
+            showBackgroundToast(context, result);
+        }, "LatinIME-learned-restore").start();
+    }
+
+    private static void installStagedDictionary(final File stagedFile, final File destination)
+            throws IOException {
+        final File replacement = new File(destination.getParentFile(), destination.getName() + ".new");
+        final File previous = new File(destination.getParentFile(), destination.getName() + ".old");
+        copyFile(stagedFile, replacement);
+        if (previous.exists()) deleteRecursively(previous);
+        final boolean hadPrevious = destination.exists();
+        if (hadPrevious && !destination.renameTo(previous)) {
+            throw new IOException("Cannot stage existing learned dictionary");
+        }
+        if (!replacement.renameTo(destination)) {
+            if (hadPrevious) previous.renameTo(destination);
+            throw new IOException("Cannot install learned dictionary");
+        }
+        if (hadPrevious) previous.delete();
+    }
+
+    private static void copyFile(final File source, final File destination) throws IOException {
+        final byte[] buffer = new byte[8192];
+        try (InputStream input = new FileInputStream(source);
+                OutputStream output = new FileOutputStream(destination)) {
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+        }
+    }
+
+    private static void deleteRecursively(final File file) {
+        if (file == null || !file.exists()) return;
+        if (file.isDirectory()) {
+            final File[] children = file.listFiles();
+            if (children != null) for (final File child : children) deleteRecursively(child);
+        }
+        file.delete();
+    }
+
+    private void showBackgroundToast(final Context context, final int message) {
+        new Handler(Looper.getMainLooper()).post(() ->
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show());
     }
 
     private void importDictionaryFile(final Uri uri) {

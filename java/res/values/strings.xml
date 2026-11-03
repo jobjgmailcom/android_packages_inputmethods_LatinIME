@@ -165,6 +165,14 @@
     <string name="bigram_prediction">Next-word suggestions</string>
     <!-- Description for "next word suggestion" option. This displays suggestions even when there is no input, based on the previous word. -->
     <string name="bigram_prediction_summary">Use the previous word in making suggestions</string>
+    <string name="prioritize_learned_words">Prioritize personal and learned words</string>
+    <string name="prioritize_learned_words_summary">Give learned and personal words a higher score in next-word suggestions</string>
+    <string name="learned_word_boost">Learned word boost level</string>
+    <string name="learned_word_boost_summary">Choose how strongly learned and personal words are prioritized</string>
+    <string name="require_learned_context">Require context match for learned words</string>
+    <string name="require_learned_context_summary">Only show a learned word when it was learned after the same preceding word context</string>
+    <string name="disable_multi_word_suggestions">Disable multi-word suggestions</string>
+    <string name="disable_multi_word_suggestions_summary">Hide suggestions that combine multiple words</string>
 
     <!-- Option to enable gesture input. The user can input a word by tracing the letters of a word without releasing the finger from the screen. [CHAR LIMIT=30]-->
     <string name="gesture_input">Enable gesture typing</string>
@@ -463,6 +471,16 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="import_dictionary_result">Imported %1$d words</string>
     <string name="import_dictionary_failed">Could not import this file. Check that it is a text word list and that Android allows dictionary access.</string>
     <string name="import_dictionary_empty">No valid words were found in this file.</string>
+    <string name="backup_learned_words">Back up learned words</string>
+    <string name="backup_learned_words_summary">Save learned words and their context to a ZIP file on your device</string>
+    <string name="restore_learned_words">Restore learned words</string>
+    <string name="restore_learned_words_summary">Restore learned words and context from a LatinIME backup ZIP</string>
+    <string name="learned_backup_success">Learned words backup saved</string>
+    <string name="learned_backup_empty">There are no learned words to back up yet</string>
+    <string name="learned_backup_failed">Could not create the learned words backup</string>
+    <string name="learned_restore_success">Learned words restored</string>
+    <string name="learned_restore_empty">No learned dictionary files were found in this backup</string>
+    <string name="learned_restore_failed">Could not restore learned words from this backup</string>
     <string name="clipboard_suggestions">Suggest copied text</string>
     <string name="clipboard_suggestions_summary">Show the latest copied text as a paste suggestion in the keyboard bar</string>
     <!-- Message about some dictionary indicating it can be downloaded, but hasn't been yet -->

@@ -18,8 +18,22 @@ package com.android.inputmethod.latin.settings;
 
 public class SettingsValuesForSuggestion {
     public final boolean mBlockPotentiallyOffensive;
+    public final boolean mPrioritizeLearnedWords;
+    public final int mLearnedWordBoost;
+    public final boolean mRequireLearnedContext;
+    public final boolean mDisableMultiWordSuggestions;
 
     public SettingsValuesForSuggestion(final boolean blockPotentiallyOffensive) {
+        this(blockPotentiallyOffensive, false, 0, false, false);
+    }
+
+    public SettingsValuesForSuggestion(final boolean blockPotentiallyOffensive,
+            final boolean prioritizeLearnedWords, final int learnedWordBoost,
+            final boolean requireLearnedContext, final boolean disableMultiWordSuggestions) {
         mBlockPotentiallyOffensive = blockPotentiallyOffensive;
+        mPrioritizeLearnedWords = prioritizeLearnedWords;
+        mLearnedWordBoost = learnedWordBoost;
+        mRequireLearnedContext = requireLearnedContext;
+        mDisableMultiWordSuggestions = disableMultiWordSuggestions;
     }
 }

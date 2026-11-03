@@ -634,9 +634,44 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
                             proximityInfoHandle, settingsValuesForSuggestion, sessionId,
                             weightForLocale, weightOfLangModelVsSpatialModel);
             if (null == dictionarySuggestions) continue;
-            suggestionResults.addAll(dictionarySuggestions);
+            final ArrayList<SuggestedWordInfo> adjustedSuggestions = new ArrayList<>(
+                    dictionarySuggestions.size());
+            final boolean isNextWordPrediction = inputStyle
+                    == SuggestedWords.INPUT_STYLE_PREDICTION
+                    || inputStyle == SuggestedWords.INPUT_STYLE_BEGINNING_OF_SENTENCE_PREDICTION;
+            for (final SuggestedWordInfo suggestion : dictionarySuggestions) {
+                if (settingsValuesForSuggestion.mDisableMultiWordSuggestions
+                        && suggestion.mWord.indexOf(' ') >= 0) {
+                    continue;
+                }
+                final boolean isLearnedWord = suggestion.mSourceDict != null
+                        && Dictionary.TYPE_USER_HISTORY.equals(suggestion.mSourceDict.mDictType);
+                final boolean isPersonalOrLearnedWord = isLearnedWord
+                        || (suggestion.mSourceDict != null
+                        && Dictionary.TYPE_USER.equals(suggestion.mSourceDict.mDictType));
+                if (isLearnedWord && isNextWordPrediction
+                        && settingsValuesForSuggestion.mRequireLearnedContext
+                        && TextUtils.isEmpty(suggestion.mPrevWordsContext)) {
+                    continue;
+                }
+                if (isPersonalOrLearnedWord && isNextWordPrediction
+                        && settingsValuesForSuggestion.mPrioritizeLearnedWords
+                        && settingsValuesForSuggestion.mLearnedWordBoost > 0) {
+                    final long boostedScore = (long) suggestion.mScore
+                            + settingsValuesForSuggestion.mLearnedWordBoost;
+                    adjustedSuggestions.add(new SuggestedWordInfo(suggestion.mWord,
+                            suggestion.mPrevWordsContext,
+                            (int) Math.min(Integer.MAX_VALUE, boostedScore),
+                            suggestion.mKindAndFlags, suggestion.mSourceDict,
+                            suggestion.mIndexOfTouchPointOfSecondWord,
+                            suggestion.mAutoCommitFirstWordConfidence));
+                } else {
+                    adjustedSuggestions.add(suggestion);
+                }
+            }
+            suggestionResults.addAll(adjustedSuggestions);
             if (null != suggestionResults.mRawSuggestions) {
-                suggestionResults.mRawSuggestions.addAll(dictionarySuggestions);
+                suggestionResults.mRawSuggestions.addAll(adjustedSuggestions);
             }
         }
         return suggestionResults;

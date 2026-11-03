@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="learned_word_boost_entries">
+        <item>Off (+0)</item>
+        <item>Low (+25)</item>
+        <item>Medium (+50)</item>
+        <item>High (+100)</item>
+        <item>Very high (+200)</item>
+    </string-array>
+    <string-array name="learned_word_boost_values">
+        <item>0</item>
+        <item>25</item>
+        <item>50</item>
+        <item>100</item>
+        <item>200</item>
+    </string-array>
+</resources>

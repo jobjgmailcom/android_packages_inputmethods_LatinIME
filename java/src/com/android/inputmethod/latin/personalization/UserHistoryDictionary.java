@@ -117,7 +117,7 @@ public class UserHistoryDictionary extends ExpandableBinaryDictionary {
     protected Map<String, String> getHeaderAttributeMap() {
         final Map<String, String> attributeMap = super.getHeaderAttributeMap();
         attributeMap.put(DictionaryHeader.USES_FORGETTING_CURVE_KEY,
-                DictionaryHeader.ATTRIBUTE_VALUE_TRUE);
+                DictionaryHeader.ATTRIBUTE_VALUE_FALSE);
         attributeMap.put(DictionaryHeader.HAS_HISTORICAL_INFO_KEY,
                 DictionaryHeader.ATTRIBUTE_VALUE_TRUE);
         return attributeMap;

@@ -2270,7 +2270,10 @@ public final class InputLogic {
                         // hence 2; if we aren't, we should just skip whitespace if any, so 1.
                         mWordComposer.isComposingWord() ? 2 : 1),
                 keyboard,
-                new SettingsValuesForSuggestion(settingsValues.mBlockPotentiallyOffensive),
+                new SettingsValuesForSuggestion(settingsValues.mBlockPotentiallyOffensive,
+                        settingsValues.mPrioritizeLearnedWords, settingsValues.mLearnedWordBoost,
+                        settingsValues.mRequireLearnedContext,
+                        settingsValues.mDisableMultiWordSuggestions),
                 settingsValues.mAutoCorrectionEnabledPerUserSettings,
                 inputStyle, sequenceNumber, callback);
     }
