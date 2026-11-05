@@ -225,12 +225,13 @@ public class NgramContext {
 
     @Override
     public int hashCode() {
-        int hashValue = 0;
+        int hashValue = 1;
         for (final WordInfo wordInfo : mPrevWordsInfo) {
-            if (wordInfo == null || !WordInfo.EMPTY_WORD_INFO.equals(wordInfo)) {
+            // Words after an empty context marker are unknown and must not be hashed.
+            if (wordInfo == null || WordInfo.EMPTY_WORD_INFO.equals(wordInfo)) {
                 break;
             }
-            hashValue ^= wordInfo.hashCode();
+            hashValue = 31 * hashValue + wordInfo.hashCode();
         }
         return hashValue;
     }

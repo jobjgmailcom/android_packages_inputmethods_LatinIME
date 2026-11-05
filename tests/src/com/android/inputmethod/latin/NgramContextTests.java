@@ -47,6 +47,22 @@ public class NgramContextTests {
     }
 
     @Test
+    public void testHashCodeAccumulatesPriorWordsInOrder() {
+        final WordInfo newestWord = new WordInfo("a");
+        final WordInfo olderWord = new WordInfo("b");
+        final NgramContext oneWordContext = new NgramContext(newestWord);
+        final int oneWordHash = 31 + newestWord.hashCode();
+        assertEquals(oneWordHash, oneWordContext.hashCode());
+
+        final NgramContext twoWordContext = new NgramContext(newestWord, olderWord);
+        assertEquals(31 * oneWordHash + olderWord.hashCode(), twoWordContext.hashCode());
+        assertFalse(twoWordContext.hashCode()
+                == new NgramContext(olderWord, newestWord).hashCode());
+        assertEquals(twoWordContext.hashCode(),
+                new NgramContext(new WordInfo("a"), new WordInfo("b")).hashCode());
+    }
+
+    @Test
     public void testIsBeginningOfSentenceContext() {
         assertFalse(new NgramContext().isBeginningOfSentenceContext());
         assertTrue(new NgramContext(WordInfo.BEGINNING_OF_SENTENCE_WORD_INFO)
