@@ -1767,7 +1767,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         final boolean shouldShowImportantNotice =
                 ImportantNoticeUtils.shouldShowImportantNotice(this, currentSettingsValues);
         final boolean shouldShowSuggestionCandidates =
-                currentSettingsValues.mInputAttributes.mShouldShowSuggestions
+                currentSettingsValues.shouldShowSuggestionsInCurrentField()
                 && currentSettingsValues.isSuggestionsEnabledPerUserSettings();
         final boolean shouldShowSuggestionsStrip =
                 !currentSettingsValues.mInputAttributes.mIsPasswordField;
@@ -1805,7 +1805,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     private SuggestedWords addClipboardSuggestionIfAvailable(final SuggestedWords suggestions,
             final SettingsValues settingsValues) {
         final InputAttributes attributes = settingsValues.mInputAttributes;
-        if (mClipboardManager == null || !attributes.mShouldShowSuggestions
+        if (mClipboardManager == null || !settingsValues.shouldShowSuggestionsInCurrentField()
                 || !PreferenceManager.getDefaultSharedPreferences(this).getBoolean(
                         Settings.PREF_CLIPBOARD_SUGGESTIONS, true)
                 || !attributes.mIsGeneralTextInput || attributes.mIsPasswordField
@@ -2233,11 +2233,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         // strategy once the implementation of
         // {@link InputMethodManager#shouldOfferSwitchingToNextInputMethod} is defined well.
         final boolean fallbackValue = mSettings.getCurrent().mIncludesOtherImesInLanguageSwitchList;
+        if (!fallbackValue) {
+            return false;
+        }
         final IBinder token = getWindow().getWindow().getAttributes().token;
         if (token == null) {
-            return fallbackValue;
+            return true;
         }
-        return mRichImm.shouldOfferSwitchingToNextInputMethod(token, fallbackValue);
+        return mRichImm.shouldOfferSwitchingToNextInputMethod(token, true);
     }
 
     public boolean shouldShowLanguageSwitchKey() {

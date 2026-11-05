@@ -40,6 +40,7 @@ public final class InputAttributes {
     final public boolean mInputTypeNoAutoCorrect;
     final public boolean mIsPasswordField;
     final public boolean mShouldShowSuggestions;
+    final public boolean mIsFilterField;
     final public boolean mApplicationSpecifiedCompletionOn;
     final public boolean mShouldInsertSpacesAutomatically;
     final public boolean mShouldShowVoiceInputKey;
@@ -80,6 +81,7 @@ public final class InputAttributes {
                 Log.w(TAG, String.format("Unexpected input class: inputType=0x%08x"
                         + " imeOptions=0x%08x", inputType, editorInfo.imeOptions));
             }
+            mIsFilterField = false;
             mShouldShowSuggestions = false;
             mInputTypeNoAutoCorrect = false;
             mApplicationSpecifiedCompletionOn = false;
@@ -100,6 +102,8 @@ public final class InputAttributes {
                 0 != (inputType & InputType.TYPE_TEXT_FLAG_AUTO_CORRECT);
         final boolean flagAutoComplete =
                 0 != (inputType & InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE);
+        mIsFilterField = InputType.TYPE_TEXT_VARIATION_FILTER == variation
+                && !mIsPasswordField && !flagNoSuggestions && !flagAutoComplete;
 
         // TODO: Have a helper method in InputTypeUtils
         // Make sure that passwords are not displayed in {@link SuggestionStripView}.

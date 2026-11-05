@@ -211,6 +211,12 @@
     <string name="user_dict_fast_scroll_alphabet" msgid="6814045626833403178">" ABCDEFGHIJKLMNÑOPQRSTUVWXYZ"</string>
     <string name="import_personal_dictionary">Importar archivo de diccionario</string>
     <string name="import_personal_dictionary_summary">Importa listas UTF-8 .txt, .csv o .tsv, una entrada por línea</string>
+    <string name="import_binary_dictionary">Importar diccionario binario (.dict)</string>
+    <string name="import_binary_dictionary_summary">Instala un diccionario binario compatible con AOSP/LatinIME</string>
+    <string name="import_binary_dictionary_success">Diccionario binario importado y recargado</string>
+    <string name="import_binary_dictionary_failed">El archivo no es un diccionario compatible con LatinIME</string>
+    <string name="show_suggestions_in_filter_fields">Mostrar sugerencias en búsquedas</string>
+    <string name="show_suggestions_in_filter_fields_summary">Mostrar sugerencias del teclado en el launcher y en búsquedas de apps cuando la app lo permita</string>
     <string name="import_dictionary_result">Se importaron %1$d palabras</string>
     <string name="import_dictionary_failed">No se pudo importar el archivo. Comprueba que sea una lista de palabras de texto y que Android permita acceder al diccionario.</string>
     <string name="import_dictionary_empty">No se encontraron palabras válidas en el archivo.</string>

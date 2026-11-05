@@ -115,6 +115,7 @@ public class SettingsValues {
     public final float mPlausibilityThreshold;
     public final boolean mAutoCorrectionEnabledPerUserSettings;
     private final boolean mSuggestionsEnabledPerUserSettings;
+    private final boolean mShowSuggestionsInFilterFields;
     private final AsyncResultHolder<AppWorkaroundsUtils> mAppWorkarounds;
 
     // Debug settings
@@ -154,9 +155,8 @@ public class SettingsValues {
         mShowNumberRow = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW, false);
         mShowNumberRowPassword = prefs.getBoolean(Settings.PREF_SHOW_NUMBER_ROW_PASSWORD, false);
         mShowLongpressHints = prefs.getBoolean(Settings.PREF_SHOW_LONGPRESS_HINTS, true);
-        mIncludesOtherImesInLanguageSwitchList = Settings.ENABLE_SHOW_LANGUAGE_SWITCH_KEY_SETTINGS
-                ? prefs.getBoolean(Settings.PREF_INCLUDE_OTHER_IMES_IN_LANGUAGE_SWITCH_LIST, false)
-                : true /* forcibly */;
+        mIncludesOtherImesInLanguageSwitchList = prefs.getBoolean(
+                Settings.PREF_INCLUDE_OTHER_IMES_IN_LANGUAGE_SWITCH_LIST, false);
         mShowsLanguageSwitchKey = Settings.ENABLE_SHOW_LANGUAGE_SWITCH_KEY_SETTINGS
                 ? Settings.readShowsLanguageSwitchKey(prefs) : true /* forcibly */;
         mShowsEmojiKey = prefs.getBoolean(Settings.PREF_SHOW_EMOJI_KEY, false);
@@ -210,6 +210,8 @@ public class SettingsValues {
         mAutoCorrectionEnabledPerUserSettings = mAutoCorrectEnabled
                 && !mInputAttributes.mInputTypeNoAutoCorrect;
         mSuggestionsEnabledPerUserSettings = readSuggestionsEnabled(prefs);
+        mShowSuggestionsInFilterFields = prefs.getBoolean(
+                Settings.PREF_SHOW_SUGGESTIONS_IN_FILTER_FIELDS, true);
         mIsInternal = Settings.isInternal(prefs);
         mHasCustomKeyPreviewAnimationParams = prefs.getBoolean(
                 DebugSettings.PREF_HAS_CUSTOM_KEY_PREVIEW_ANIMATION_PARAMS, false);
@@ -259,8 +261,13 @@ public class SettingsValues {
     }
 
     public boolean needsToLookupSuggestions() {
-        return mInputAttributes.mShouldShowSuggestions
+        return shouldShowSuggestionsInCurrentField()
                 && (mAutoCorrectionEnabledPerUserSettings || isSuggestionsEnabledPerUserSettings());
+    }
+
+    public boolean shouldShowSuggestionsInCurrentField() {
+        return mInputAttributes.mShouldShowSuggestions
+                || (mInputAttributes.mIsFilterField && mShowSuggestionsInFilterFields);
     }
 
     public boolean isSuggestionsEnabledPerUserSettings() {

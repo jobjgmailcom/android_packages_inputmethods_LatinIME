@@ -29,6 +29,10 @@
         android:title="@string/import_personal_dictionary"
         android:summary="@string/import_personal_dictionary_summary" />
     <Preference
+        android:key="pref_import_binary_dictionary"
+        android:title="@string/import_binary_dictionary"
+        android:summary="@string/import_binary_dictionary_summary" />
+    <Preference
         android:key="backup_learned_words"
         android:title="@string/backup_learned_words"
         android:summary="@string/backup_learned_words_summary" />
@@ -69,6 +73,12 @@
         android:key="show_suggestions"
         android:summary="@string/prefs_show_suggestions_summary"
         android:title="@string/prefs_show_suggestions"
+        android:defaultValue="true"
+        android:persistent="true" />
+    <SwitchPreferenceCompat
+        android:key="pref_show_suggestions_in_filter_fields"
+        android:title="@string/show_suggestions_in_filter_fields"
+        android:summary="@string/show_suggestions_in_filter_fields_summary"
         android:defaultValue="true"
         android:persistent="true" />
     <SwitchPreferenceCompat

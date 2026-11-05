@@ -34,7 +34,11 @@ import android.text.TextUtils;
 import android.widget.Toast;
 
 import com.android.inputmethod.dictionarypack.DictionarySettingsActivity;
+import com.android.inputmethod.dictionarypack.DictionaryPackConstants;
 import com.android.inputmethod.latin.R;
+import com.android.inputmethod.latin.ReadOnlyBinaryDictionary;
+import com.android.inputmethod.latin.makedict.DictionaryHeader;
+import com.android.inputmethod.latin.utils.DictionaryInfoUtils;
 import com.android.inputmethod.compat.UserDictionaryCompatUtils;
 import com.android.inputmethod.latin.personalization.PersonalizationHelper;
 import com.android.inputmethod.latin.permissions.PermissionsManager;
@@ -83,8 +87,10 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
     private static final int REQUEST_IMPORT_DICTIONARY = 4107;
     private static final int REQUEST_BACKUP_LEARNED_WORDS = 4108;
     private static final int REQUEST_RESTORE_LEARNED_WORDS = 4109;
+    private static final int REQUEST_IMPORT_BINARY_DICTIONARY = 4110;
     private static final int MAX_IMPORTED_WORDS = 10000;
     private static final long MAX_LEARNED_BACKUP_BYTES = 80L * 1024 * 1024;
+    private static final long MAX_IMPORTED_BINARY_DICTIONARY_BYTES = 80L * 1024 * 1024;
 
     @Override
     public void onCreate(final Bundle icicle) {
@@ -128,6 +134,16 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
                 return true;
             });
         }
+        final Preference binaryImportPreference = findPreference("pref_import_binary_dictionary");
+        if (binaryImportPreference != null) {
+            binaryImportPreference.setOnPreferenceClickListener(preference -> {
+                final Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                picker.addCategory(Intent.CATEGORY_OPENABLE);
+                picker.setType("*/*");
+                startActivityForResult(picker, REQUEST_IMPORT_BINARY_DICTIONARY);
+                return true;
+            });
+        }
         final Preference backupLearnedPreference = findPreference("backup_learned_words");
         if (backupLearnedPreference != null) {
             backupLearnedPreference.setOnPreferenceClickListener(preference -> {
@@ -159,6 +175,8 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
         }
         if (requestCode == REQUEST_IMPORT_DICTIONARY) {
             importDictionaryFile(data.getData());
+        } else if (requestCode == REQUEST_IMPORT_BINARY_DICTIONARY) {
+            importBinaryDictionaryFile(data.getData());
         } else if (requestCode == REQUEST_BACKUP_LEARNED_WORDS) {
             backupLearnedWords(data.getData());
         } else if (requestCode == REQUEST_RESTORE_LEARNED_WORDS) {
@@ -348,6 +366,73 @@ public final class CorrectionSettingsFragment extends SubScreenFragment
             Toast.makeText(getActivity(), R.string.import_dictionary_failed,
                     Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void importBinaryDictionaryFile(final Uri uri) {
+        final Context context = getActivity().getApplicationContext();
+        new Thread(() -> {
+            int result = R.string.import_binary_dictionary_failed;
+            File temporaryFile = null;
+            try {
+                temporaryFile = File.createTempFile(
+                        "latinime-import-", ".dict", context.getCacheDir());
+                final InputStream source = context.getContentResolver().openInputStream(uri);
+                if (source == null) throw new IOException("Cannot open dictionary file");
+                long totalBytes = 0;
+                final byte[] buffer = new byte[8192];
+                try (InputStream input = source;
+                        FileOutputStream output = new FileOutputStream(temporaryFile)) {
+                    int count;
+                    while ((count = input.read(buffer)) != -1) {
+                        totalBytes += count;
+                        if (totalBytes > MAX_IMPORTED_BINARY_DICTIONARY_BYTES) {
+                            throw new IOException("Dictionary file is too large");
+                        }
+                        output.write(buffer, 0, count);
+                    }
+                }
+                final DictionaryHeader header = DictionaryInfoUtils.getDictionaryFileHeaderOrNull(
+                        temporaryFile, 0, temporaryFile.length());
+                if (header == null || header.mIdString.isEmpty()) {
+                    throw new IOException("Invalid dictionary header");
+                }
+                final String dictionaryVersion = header.mDictionaryOptions.mAttributes.get(
+                        DictionaryHeader.DICTIONARY_VERSION_KEY);
+                if (dictionaryVersion == null || Integer.parseInt(dictionaryVersion) < 18) {
+                    throw new IOException("Unsupported dictionary version");
+                }
+                final Locale locale = Locale.forLanguageTag(header.mLocaleString.replace('_', '-'));
+                if (TextUtils.isEmpty(locale.getLanguage()) || "und".equals(locale.getLanguage())) {
+                    throw new IOException("Invalid dictionary locale");
+                }
+                final ReadOnlyBinaryDictionary validator = new ReadOnlyBinaryDictionary(
+                        temporaryFile.getAbsolutePath(), 0, temporaryFile.length(),
+                        false /* useFullEditDistance */, locale, "import_validation");
+                final boolean valid;
+                try {
+                    valid = validator.isValidDictionary();
+                } finally {
+                    validator.close();
+                }
+                if (!valid) throw new IOException("Unsupported binary dictionary format");
+
+                // Keep imported dictionaries separate so an experimental file never replaces
+                // the built-in language dictionary.
+                final String importedId = "imported_"
+                        + UUID.randomUUID().toString().replace("-", "") + ":"
+                        + locale.toString().toLowerCase(Locale.ROOT);
+                final File destination = new File(DictionaryInfoUtils.getCacheFileName(
+                        importedId, locale.toString(), context));
+                installStagedDictionary(temporaryFile, destination);
+                context.sendBroadcast(new Intent(DictionaryPackConstants.NEW_DICTIONARY_INTENT_ACTION));
+                result = R.string.import_binary_dictionary_success;
+            } catch (final IOException | SecurityException | NumberFormatException e) {
+                result = R.string.import_binary_dictionary_failed;
+            } finally {
+                if (temporaryFile != null) temporaryFile.delete();
+            }
+            showBackgroundToast(context, result);
+        }, "LatinIME-dictionary-import").start();
     }
 
     private static String unquote(final String value) {
