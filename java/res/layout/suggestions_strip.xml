@@ -74,6 +74,16 @@
         android:contentDescription="@string/spoken_description_split_keyboard"
         style="?attr/suggestionWordStyle" />
     <ImageButton
+        android:id="@+id/suggestions_strip_clipboard_history_key"
+        android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
+        android:layout_height="fill_parent"
+        android:layout_toStartOf="@id/suggestions_strip_voice_key"
+        android:layout_toLeftOf="@id/suggestions_strip_voice_key"
+        android:layout_centerVertical="true"
+        android:contentDescription="@string/clipboard_history_button_description"
+        android:visibility="gone"
+        style="?attr/suggestionWordStyle" />
+    <ImageButton
         android:id="@+id/suggestions_strip_voice_key"
         android:layout_width="@dimen/config_suggestions_strip_edge_key_width"
         android:layout_height="fill_parent"

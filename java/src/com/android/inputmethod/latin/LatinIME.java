@@ -48,6 +48,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.preference.PreferenceManager;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.util.Log;
 import android.util.PrintWriterPrinter;
 import android.util.Printer;
@@ -61,6 +62,8 @@ import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodSubtype;
@@ -223,12 +226,16 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     public final UIHandler mHandler = new UIHandler(this);
     private ClipboardManager mClipboardManager;
+    private ClipboardHistoryStore mClipboardHistoryStore;
     private boolean mClipboardListenerRegistered;
+    private String mDismissedClipboardIdentity;
+    private String mProgrammaticClipboardText;
+    private long mClipboardChangeSequence;
     private final ClipboardManager.OnPrimaryClipChangedListener mClipboardListener =
             new ClipboardManager.OnPrimaryClipChangedListener() {
         @Override
         public void onPrimaryClipChanged() {
-            mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+            handlePrimaryClipChanged();
         }
     };
 
@@ -633,6 +640,7 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         mDisplayContext = getDisplayContext();
         KeyboardSwitcher.init(this);
         super.onCreate();
+        mClipboardHistoryStore = new ClipboardHistoryStore(this);
 
         mHandler.onCreate();
 
@@ -793,6 +801,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
 
     @Override
     public void onDestroy() {
+        if (mClipboardManager != null && mClipboardListenerRegistered) {
+            mClipboardManager.removePrimaryClipChangedListener(mClipboardListener);
+            mClipboardListenerRegistered = false;
+        }
         mDictionaryFacilitator.closeDictionaries();
         mSettings.onDestroy();
         unregisterReceiver(mHideSoftInputReceiver);
@@ -921,6 +933,14 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
         mHandler.onStartInputView(editorInfo, restarting);
         mStatsUtilsManager.onStartInputView();
+        updateClipboardHistoryKeyVisibility();
+        if (isClipboardHistoryEnabled() && mClipboardHistoryStore != null) {
+            final ClipData clip = getPrimaryClipSafely();
+            final InputAttributes attributes = mSettings.getCurrent().mInputAttributes;
+            final boolean isSensitiveField = attributes.mIsPasswordField
+                    || attributes.mNoPersonalizedLearning || !attributes.mIsGeneralTextInput;
+            mClipboardHistoryStore.addClip(clip, isSensitiveField);
+        }
     }
 
     @Override
@@ -1753,8 +1773,72 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         return null != mSuggestionStripView;
     }
 
+    private boolean isClipboardHistoryEnabled() {
+        return PreferenceManager.getDefaultSharedPreferences(this).getBoolean(
+                Settings.PREF_CLIPBOARD_HISTORY, false);
+    }
+
+    private void updateClipboardHistoryKeyVisibility() {
+        if (!hasSuggestionStripView()) {
+            return;
+        }
+        final InputAttributes attributes = mSettings.getCurrent().mInputAttributes;
+        mSuggestionStripView.setClipboardHistoryKeyVisible(isClipboardHistoryEnabled()
+                && attributes.mIsGeneralTextInput && !attributes.mIsPasswordField
+                && !attributes.mNoPersonalizedLearning);
+    }
+
+    private ClipData getPrimaryClipSafely() {
+        if (mClipboardManager == null) {
+            return null;
+        }
+        try {
+            return mClipboardManager.getPrimaryClip();
+        } catch (final SecurityException e) {
+            return null;
+        }
+    }
+
+    private String getClipboardIdentity(final ClipData clip) {
+        if (clip == null || clip.getItemCount() == 0 || clip.getDescription() == null
+                || !clip.getDescription().hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+            return null;
+        }
+        final CharSequence text = clip.getItemAt(0).getText();
+        if (TextUtils.isEmpty(text) || text.length() > 5000) {
+            return null;
+        }
+        final long clipTimestamp = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                ? clip.getDescription().getTimestamp() : 0L;
+        final long clipVersion = clipTimestamp > 0 ? clipTimestamp : mClipboardChangeSequence;
+        return clipVersion + ":" + text;
+    }
+
+    private void handlePrimaryClipChanged() {
+        final ClipData clip = getPrimaryClipSafely();
+        final CharSequence changedText = clip != null && clip.getItemCount() > 0
+                ? clip.getItemAt(0).getText() : null;
+        if (mProgrammaticClipboardText != null
+                && mProgrammaticClipboardText.contentEquals(changedText == null ? "" : changedText)) {
+            mProgrammaticClipboardText = null;
+        } else {
+            mProgrammaticClipboardText = null;
+            mDismissedClipboardIdentity = null;
+            mClipboardChangeSequence++;
+        }
+        if (isClipboardHistoryEnabled() && mClipboardHistoryStore != null) {
+            final InputAttributes attributes = mSettings.getCurrent().mInputAttributes;
+            final boolean isSensitiveField = attributes.mIsPasswordField
+                    || attributes.mNoPersonalizedLearning || !attributes.mIsGeneralTextInput;
+            mClipboardHistoryStore.addClip(clip, isSensitiveField);
+        }
+        updateClipboardHistoryKeyVisibility();
+        mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+    }
+
     private void setSuggestedWords(final SuggestedWords suggestedWords) {
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
+        updateClipboardHistoryKeyVisibility();
         mInputLogic.setSuggestedWords(suggestedWords);
         // TODO: Modify this when we support suggestions with hard keyboard
         if (!hasSuggestionStripView()) {
@@ -1823,6 +1907,10 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
             if (description == null || !description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
                 return suggestions;
             }
+            final String clipboardIdentity = getClipboardIdentity(clip);
+            if (clipboardIdentity == null || clipboardIdentity.equals(mDismissedClipboardIdentity)) {
+                return suggestions;
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && description.getExtras() != null
                     && description.getExtras().getBoolean(ClipDescription.EXTRA_IS_SENSITIVE,
                             false)) {
@@ -1857,6 +1945,124 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
         }
     }
 
+    @Override
+    public void showClipboardHistory() {
+        if (!isClipboardHistoryEnabled() || mClipboardHistoryStore == null) {
+            return;
+        }
+        final InputAttributes attributes = mSettings.getCurrent().mInputAttributes;
+        if (!attributes.mIsGeneralTextInput || attributes.mIsPasswordField
+                || attributes.mNoPersonalizedLearning) {
+            return;
+        }
+        final ArrayList<ClipboardHistoryStore.Entry> entries =
+                new ArrayList<>(mClipboardHistoryStore.getEntries());
+        if (entries.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.clipboard_history_title)
+                    .setMessage(R.string.clipboard_history_empty)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+
+        final ArrayList<String> labels = new ArrayList<>();
+        updateClipboardHistoryLabels(entries, labels);
+        final ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_list_item_1, labels);
+        final AlertDialog historyDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.clipboard_history_title)
+                .setAdapter(adapter, (dialog, which) -> {
+                    if (which >= 0 && which < entries.size()) {
+                        pasteClipboardHistoryEntry(entries.get(which).text);
+                    }
+                })
+                .setPositiveButton(R.string.clipboard_history_clear, (dialog, which) -> {
+                    new AlertDialog.Builder(this)
+                            .setMessage(R.string.clipboard_history_clear_confirmation)
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .setPositiveButton(R.string.clipboard_history_clear,
+                                    (confirmation, selected) -> {
+                                        mClipboardHistoryStore.clear();
+                                        updateClipboardHistoryKeyVisibility();
+                                    })
+                            .show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        historyDialog.show();
+        historyDialog.getListView().setOnItemLongClickListener((parent, view, position, id) -> {
+            if (position < 0 || position >= entries.size()) {
+                return false;
+            }
+            final ClipboardHistoryStore.Entry entry = entries.get(position);
+            final CharSequence[] actions = new CharSequence[] {
+                    getString(entry.pinned ? R.string.clipboard_history_unpin
+                            : R.string.clipboard_history_pin),
+                    getString(R.string.clipboard_history_delete)
+            };
+            new AlertDialog.Builder(this)
+                    .setTitle(getClipboardHistoryPreview(entry.text))
+                    .setItems(actions, (actionDialog, action) -> {
+                        if (action == 0) {
+                            mClipboardHistoryStore.togglePinned(entry.id);
+                        } else if (action == 1) {
+                            mClipboardHistoryStore.delete(entry.id);
+                        }
+                        entries.clear();
+                        entries.addAll(mClipboardHistoryStore.getEntries());
+                        labels.clear();
+                        updateClipboardHistoryLabels(entries, labels);
+                        adapter.notifyDataSetChanged();
+                    })
+                    .show();
+            return true;
+        });
+    }
+
+    private void updateClipboardHistoryLabels(
+            final List<ClipboardHistoryStore.Entry> entries, final List<String> labels) {
+        for (final ClipboardHistoryStore.Entry entry : entries) {
+            labels.add((entry.pinned ? "★ " : "") + getClipboardHistoryPreview(entry.text));
+        }
+    }
+
+    private static String getClipboardHistoryPreview(final String text) {
+        final String oneLine = text.replace('\n', ' ').replace('\r', ' ');
+        return oneLine.length() > 100 ? oneLine.substring(0, 99) + "…" : oneLine;
+    }
+
+    private void pasteClipboardHistoryEntry(final String text) {
+        if (mClipboardManager == null) {
+            mClipboardManager = (ClipboardManager)getSystemService(Context.CLIPBOARD_SERVICE);
+        }
+        if (mClipboardManager == null) {
+            return;
+        }
+        try {
+            mProgrammaticClipboardText = text;
+            mClipboardManager.setPrimaryClip(ClipData.newPlainText(
+                    getString(R.string.clipboard_history_title), text));
+            mDismissedClipboardIdentity = getClipboardIdentity(getPrimaryClipSafely());
+            onCodeInput(Constants.CODE_CLIPBOARD_PASTE, 0, 0, false /* isKeyRepeat */);
+            mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+            mHandler.postDelayed(() -> {
+                if (text.equals(mProgrammaticClipboardText)) {
+                    mProgrammaticClipboardText = null;
+                }
+            }, 2500L);
+        } catch (final SecurityException e) {
+            mProgrammaticClipboardText = null;
+            // Do not paste a history entry if Android denies clipboard access.
+        }
+    }
+
+    @Override
+    public void dismissClipboardSuggestion() {
+        mDismissedClipboardIdentity = getClipboardIdentity(getPrimaryClipSafely());
+        mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
+    }
+
     // TODO[IL]: Move this out of LatinIME.
     public void getSuggestedWords(final int inputStyle, final int sequenceNumber,
             final OnGetSuggestedWordsCallback callback) {
@@ -1886,7 +2092,9 @@ public class LatinIME extends InputMethodService implements KeyboardActionListen
     @Override
     public void pickSuggestionManually(final SuggestedWordInfo suggestionInfo) {
         if (suggestionInfo.getKind() == SuggestedWordInfo.KIND_CLIPBOARD) {
+            mDismissedClipboardIdentity = getClipboardIdentity(getPrimaryClipSafely());
             onCodeInput(Constants.CODE_CLIPBOARD_PASTE, 0, 0, false /* isKeyRepeat */);
+            mHandler.postUpdateSuggestionStrip(SuggestedWords.INPUT_STYLE_NONE);
             return;
         }
         final InputTransaction completeInputTransaction = mInputLogic.onPickSuggestionManually(

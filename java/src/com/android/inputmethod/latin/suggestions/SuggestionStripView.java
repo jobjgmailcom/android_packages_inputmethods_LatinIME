@@ -62,6 +62,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     public interface Listener {
         public void showImportantNoticeContents();
         public void pickSuggestionManually(SuggestedWordInfo word);
+        public void showClipboardHistory();
+        public void dismissClipboardSuggestion();
         public void onCodeInput(int primaryCode, int x, int y, boolean isKeyRepeat);
         public void toggleSplitKeyboard();
         public void toggleFloatingKeyboard();
@@ -74,6 +76,7 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
     private final ViewGroup mSuggestionsStrip;
     private final ImageButton mVoiceKey;
+    private final ImageButton mClipboardHistoryKey;
     private final ImageButton mSplitKey;
     private final ImageButton mFloatKey;
     private final int mDockedStripMargin;
@@ -85,6 +88,7 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     private final MoreSuggestions.Builder mMoreSuggestionsBuilder;
 
     private final ArrayList<TextView> mWordViews = new ArrayList<>();
+    private final ArrayList<Drawable> mDefaultSuggestionBackgrounds = new ArrayList<>();
     private final ArrayList<TextView> mDebugInfoViews = new ArrayList<>();
     private final ArrayList<View> mDividerViews = new ArrayList<>();
 
@@ -149,6 +153,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
         mSuggestionsStrip = (ViewGroup)findViewById(R.id.suggestions_strip);
         mVoiceKey = (ImageButton)findViewById(R.id.suggestions_strip_voice_key);
+        mClipboardHistoryKey = (ImageButton)findViewById(
+                R.id.suggestions_strip_clipboard_history_key);
         mSplitKey = (ImageButton)findViewById(R.id.suggestions_strip_split_key);
         mFloatKey = (ImageButton)findViewById(R.id.suggestions_strip_float_key);
         mDockedStripMargin =
@@ -163,6 +169,7 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
             word.setOnClickListener(this);
             word.setOnLongClickListener(this);
             mWordViews.add(word);
+            mDefaultSuggestionBackgrounds.add(word.getBackground());
             final View divider = inflater.inflate(R.layout.suggestion_divider, null);
             mDividerViews.add(divider);
             final TextView info = new TextView(context, null, R.attr.suggestionWordStyle);
@@ -191,6 +198,9 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         keyboardAttr.recycle();
         mVoiceKey.setImageDrawable(iconVoice);
         mVoiceKey.setOnClickListener(this);
+        mClipboardHistoryKey.setImageResource(R.drawable.ic_clipboard_history);
+        mClipboardHistoryKey.setImageTintList(getToolKeyTintList());
+        mClipboardHistoryKey.setOnClickListener(this);
         mSplitKey.setImageTintList(getToolKeyTintList());
         mSplitKey.setOnClickListener(this);
         mFloatKey.setImageTintList(getToolKeyTintList());
@@ -230,8 +240,33 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
                 ? getResources().getDimensionPixelSize(
                         R.dimen.config_suggestions_strip_edge_key_width)
                 : mDockedStripMargin;
-        setHorizontalMargins(mSuggestionsStrip, margin);
+        updateSuggestionStripHorizontalMargins();
         setHorizontalMargins(mImportantNoticeStrip, margin);
+    }
+
+    public void setClipboardHistoryKeyVisible(final boolean visible) {
+        final int newVisibility = visible ? VISIBLE : GONE;
+        if (mClipboardHistoryKey.getVisibility() == newVisibility) {
+            return;
+        }
+        mClipboardHistoryKey.setVisibility(newVisibility);
+        updateSuggestionStripHorizontalMargins();
+    }
+
+    private void updateSuggestionStripHorizontalMargins() {
+        final boolean isFloating = Settings.getInstance().getCurrent().mIsFloatingKeyboardEnabled;
+        final int baseMargin = isFloating
+                ? getResources().getDimensionPixelSize(
+                        R.dimen.config_suggestions_strip_edge_key_width)
+                : mDockedStripMargin;
+        final int endMargin = baseMargin + (mClipboardHistoryKey.getVisibility() == VISIBLE
+                ? getResources().getDimensionPixelSize(
+                        R.dimen.config_suggestions_strip_edge_key_width) : 0);
+        final MarginLayoutParams params = (MarginLayoutParams)mSuggestionsStrip.getLayoutParams();
+        params.setMargins(baseMargin, params.topMargin, endMargin, params.bottomMargin);
+        params.setMarginStart(baseMargin);
+        params.setMarginEnd(endMargin);
+        mSuggestionsStrip.setLayoutParams(params);
     }
 
     private static void setHorizontalMargins(final View view, final int margin) {
@@ -266,7 +301,66 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         mSuggestedWords = suggestedWords;
         mStartIndexOfMoreSuggestions = mLayoutHelper.layoutAndReturnStartIndexOfMoreSuggestions(
                 getContext(), mSuggestedWords, mSuggestionsStrip, this);
+        applyClipboardCapsulePresentation();
         mStripVisibilityGroup.showSuggestionsStrip();
+    }
+
+    private void applyClipboardCapsulePresentation() {
+        for (final TextView wordView : mWordViews) {
+            final Object tag = wordView.getTag();
+            if (!(tag instanceof Integer)) {
+                continue;
+            }
+            final int index = (Integer)tag;
+            if (index < 0 || index >= mSuggestedWords.size()
+                    || mSuggestedWords.getInfo(index).getKind()
+                            != SuggestedWordInfo.KIND_CLIPBOARD) {
+                continue;
+            }
+            final int textColor = wordView.getCurrentTextColor();
+            final int chipColor = Color.luminance(textColor) > 0.5f
+                    ? 0xFF263238 : 0xFFE4E7EB;
+            final android.graphics.drawable.GradientDrawable chipBackground =
+                    new android.graphics.drawable.GradientDrawable();
+            chipBackground.setColor(chipColor);
+            chipBackground.setCornerRadius(18.0f * getResources().getDisplayMetrics().density);
+            wordView.setBackground(chipBackground);
+
+            final Drawable clipboardIcon = getResources().getDrawable(
+                    R.drawable.sym_keyboard_clipboard_paste, getContext().getTheme());
+            final Drawable dismissIcon = getResources().getDrawable(
+                    R.drawable.ic_clipboard_dismiss, getContext().getTheme());
+            clipboardIcon.setTint(textColor);
+            dismissIcon.setTint(textColor);
+            wordView.setCompoundDrawablePadding((int)(5.0f
+                    * getResources().getDisplayMetrics().density));
+            wordView.setCompoundDrawablesWithIntrinsicBounds(
+                    clipboardIcon, null, dismissIcon, null);
+            wordView.setContentDescription(getResources().getString(
+                    R.string.clipboard_suggestion_accessibility,
+                    mSuggestedWords.getWord(index)));
+            wordView.setOnTouchListener((view, event) -> {
+                if (event.getActionMasked() == MotionEvent.ACTION_UP) {
+                    if (mListener != null) {
+                        AudioAndHapticFeedbackManager.getInstance()
+                                .performHapticAndAudioFeedback(Constants.CODE_UNSPECIFIED, this);
+                        final int densityDpi = getResources().getDisplayMetrics().densityDpi;
+                        final int minimumHitWidth = (int)(36.0f * densityDpi / 160.0f);
+                        final int extraHitWidth = (int)(8.0f * densityDpi / 160.0f);
+                        final int dismissZoneWidth = Math.min(view.getWidth() / 2,
+                                Math.max(minimumHitWidth, dismissIcon.getIntrinsicWidth()
+                                        + wordView.getCompoundDrawablePadding() + extraHitWidth));
+                        if (event.getX() >= view.getWidth() - dismissZoneWidth) {
+                            mListener.dismissClipboardSuggestion();
+                        } else {
+                            mListener.pickSuggestionManually(mSuggestedWords.getInfo(index));
+                        }
+                    }
+                }
+                return true;
+            });
+            return;
+        }
     }
 
     public void setMoreSuggestionsHeight(final int remainingHeight) {
@@ -300,6 +394,12 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
     public void clear() {
         mSuggestionsStrip.removeAllViews();
+        for (int i = 0; i < mWordViews.size(); i++) {
+            final TextView wordView = mWordViews.get(i);
+            wordView.setOnTouchListener(null);
+            wordView.setBackground(mDefaultSuggestionBackgrounds.get(i));
+            wordView.setCompoundDrawablesWithIntrinsicBounds(null, null, null, null);
+        }
         removeAllDebugInfoViews();
         mStripVisibilityGroup.showSuggestionsStrip();
         dismissMoreSuggestionsPanel();
@@ -524,6 +624,10 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         if (view == mSplitKey) {
             mListener.toggleSplitKeyboard();
             updateSplitKey();
+            return;
+        }
+        if (view == mClipboardHistoryKey) {
+            mListener.showClipboardHistory();
             return;
         }
         if (view == mVoiceKey) {
