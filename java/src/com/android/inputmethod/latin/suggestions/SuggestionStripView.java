@@ -22,11 +22,13 @@ import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import androidx.core.view.ViewCompat;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.TypedValue;
 import android.view.GestureDetector;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -36,6 +38,7 @@ import android.view.ViewGroup;
 import android.view.ViewParent;
 import android.view.accessibility.AccessibilityEvent;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -63,6 +66,7 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         public void showImportantNoticeContents();
         public void pickSuggestionManually(SuggestedWordInfo word);
         public void showClipboardHistory();
+        public void pickClipboardSuggestion();
         public void dismissClipboardSuggestion();
         public void onCodeInput(int primaryCode, int x, int y, boolean isKeyRepeat);
         public void toggleSplitKeyboard();
@@ -74,7 +78,7 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     private static final int TOOL_KEY_ALPHA_ON = 255;
     private static final int TOOL_KEY_ALPHA_OFF = 128;
 
-    private final ViewGroup mSuggestionsStrip;
+    private final LinearLayout mSuggestionsStrip;
     private final ImageButton mVoiceKey;
     private final ImageButton mClipboardHistoryKey;
     private final ImageButton mSplitKey;
@@ -95,6 +99,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
     Listener mListener;
     private SuggestedWords mSuggestedWords = SuggestedWords.getEmptyInstance();
     private int mStartIndexOfMoreSuggestions;
+    private final int mDefaultSuggestionsStripGravity;
+    private boolean mClipboardSuggestionVisible;
 
     private final SuggestionStripLayoutHelper mLayoutHelper;
     private final StripVisibilityGroup mStripVisibilityGroup;
@@ -151,7 +157,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         final LayoutInflater inflater = LayoutInflater.from(context);
         inflater.inflate(R.layout.suggestions_strip, this);
 
-        mSuggestionsStrip = (ViewGroup)findViewById(R.id.suggestions_strip);
+        mSuggestionsStrip = (LinearLayout)findViewById(R.id.suggestions_strip);
+        mDefaultSuggestionsStripGravity = mSuggestionsStrip.getGravity();
         mVoiceKey = (ImageButton)findViewById(R.id.suggestions_strip_voice_key);
         mClipboardHistoryKey = (ImageButton)findViewById(
                 R.id.suggestions_strip_clipboard_history_key);
@@ -305,6 +312,75 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
         mStripVisibilityGroup.showSuggestionsStrip();
     }
 
+    /** Displays the current clip as an independent pill, not as a prediction result. */
+    public void setClipboardSuggestion(final String text) {
+        clear();
+        if (TextUtils.isEmpty(text)) {
+            return;
+        }
+        final LinearLayout capsule = (LinearLayout)LayoutInflater.from(getContext()).inflate(
+                R.layout.clipboard_suggestion, mSuggestionsStrip, false);
+        final TextView textView = capsule.findViewById(R.id.clipboard_suggestion_text);
+        final ImageButton closeButton = capsule.findViewById(R.id.clipboard_suggestion_close);
+        final int textColor = mWordViews.get(0).getCurrentTextColor();
+        final int backgroundColor = Color.luminance(textColor) > 0.5f
+                ? 0xFF263238 : 0xFFE4E7EB;
+        final GradientDrawable background = new GradientDrawable();
+        background.setColor(backgroundColor);
+        background.setCornerRadius(18.0f * getResources().getDisplayMetrics().density);
+        capsule.setBackground(background);
+
+        final String oneLineText = text.replace('\n', ' ').replace('\r', ' ');
+        textView.setText(oneLineText);
+        textView.setTextColor(textColor);
+        textView.setContentDescription(getResources().getString(
+                R.string.clipboard_suggestion_accessibility, oneLineText));
+        final float density = getResources().getDisplayMetrics().density;
+        final int availableWidth = mSuggestionsStrip.getWidth() > 0
+                ? mSuggestionsStrip.getWidth() : getResources().getDisplayMetrics().widthPixels;
+        final int edgeKeyWidth = getResources().getDimensionPixelSize(
+                R.dimen.config_suggestions_strip_edge_key_width);
+        int reservedWidth = 0;
+        final ImageButton[] edgeKeys = { mFloatKey, mSplitKey, mClipboardHistoryKey, mVoiceKey };
+        for (final ImageButton edgeKey : edgeKeys) {
+            if (edgeKey.getVisibility() == VISIBLE) {
+                reservedWidth += edgeKey.getWidth() > 0 ? edgeKey.getWidth() : edgeKeyWidth;
+            }
+        }
+        textView.setMaxWidth(Math.max((int)(48.0f * density),
+                availableWidth - reservedWidth - (int)(12.0f * density)));
+        final Drawable pasteIcon = getResources().getDrawable(
+                R.drawable.sym_keyboard_clipboard_paste, getContext().getTheme()).mutate();
+        pasteIcon.setTint(textColor);
+        textView.setCompoundDrawablePadding((int)(6.0f * density));
+        textView.setCompoundDrawablesWithIntrinsicBounds(pasteIcon, null, null, null);
+        closeButton.setImageResource(R.drawable.ic_clipboard_dismiss);
+        closeButton.setImageTintList(ColorStateList.valueOf(textColor));
+        textView.setOnClickListener(v -> {
+            if (mListener != null) {
+                AudioAndHapticFeedbackManager.getInstance()
+                        .performHapticAndAudioFeedback(Constants.CODE_UNSPECIFIED, textView);
+                mListener.pickClipboardSuggestion();
+            }
+        });
+        closeButton.setOnClickListener(v -> {
+            if (mListener != null) {
+                AudioAndHapticFeedbackManager.getInstance()
+                        .performHapticAndAudioFeedback(Constants.CODE_UNSPECIFIED, closeButton);
+                mListener.dismissClipboardSuggestion();
+            }
+        });
+        mSuggestionsStrip.setGravity(Gravity.CENTER);
+        mSuggestionsStrip.addView(capsule, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        mClipboardSuggestionVisible = true;
+        mStripVisibilityGroup.showSuggestionsStrip();
+    }
+
+    public boolean isClipboardSuggestionVisible() {
+        return mClipboardSuggestionVisible;
+    }
+
     private void applyClipboardCapsulePresentation() {
         for (final TextView wordView : mWordViews) {
             final Object tag = wordView.getTag();
@@ -394,6 +470,8 @@ public final class SuggestionStripView extends RelativeLayout implements OnClick
 
     public void clear() {
         mSuggestionsStrip.removeAllViews();
+        mSuggestionsStrip.setGravity(mDefaultSuggestionsStripGravity);
+        mClipboardSuggestionVisible = false;
         for (int i = 0; i < mWordViews.size(); i++) {
             final TextView wordView = mWordViews.get(i);
             wordView.setOnTouchListener(null);

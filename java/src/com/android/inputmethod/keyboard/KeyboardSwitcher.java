@@ -26,6 +26,7 @@ import android.util.Log;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 
 import androidx.annotation.NonNull;
@@ -38,6 +39,7 @@ import com.android.inputmethod.keyboard.internal.KeyboardState;
 import com.android.inputmethod.keyboard.internal.KeyboardTextsSet;
 import com.android.inputmethod.latin.InputView;
 import com.android.inputmethod.latin.LatinIME;
+import com.android.inputmethod.latin.ClipboardHistoryPanel;
 import com.android.inputmethod.latin.R;
 import com.android.inputmethod.latin.RichInputMethodManager;
 import com.android.inputmethod.latin.WordComposer;
@@ -60,6 +62,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     private InputView mCurrentInputView;
     private View mMainKeyboardFrame;
     private MainKeyboardView mKeyboardView;
+    private ClipboardHistoryPanel mClipboardHistoryPanel;
     private EmojiPalettesView mEmojiPalettesView;
     private FloatingKeyboardController mFloatingKeyboardController;
     private boolean mIsFloating;
@@ -328,6 +331,9 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
         final int visibility =  isImeSuppressedByHardwareKeyboard(settingsValues, toggleState)
                 ? View.GONE : View.VISIBLE;
         mKeyboardView.setVisibility(visibility);
+        if (mClipboardHistoryPanel != null) {
+            mClipboardHistoryPanel.setVisibility(View.GONE);
+        }
         // The visibility of {@link #mKeyboardView} must be aligned with {@link #MainKeyboardFrame}.
         // @see #getVisibleKeyboardView() and
         // @see LatinIME#onComputeInset(android.inputmethodservice.InputMethodService.Insets)
@@ -484,17 +490,54 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
     }
 
     public boolean isShowingMoreKeysPanel() {
-        if (isShowingEmojiPalettes()) {
+        if (isShowingEmojiPalettes() || isShowingClipboardHistoryPanel()) {
             return false;
         }
         return mKeyboardView.isShowingMoreKeysPanel();
     }
 
     public View getVisibleKeyboardView() {
+        if (isShowingClipboardHistoryPanel()) {
+            return mClipboardHistoryPanel;
+        }
         if (isShowingEmojiPalettes()) {
             return mEmojiPalettesView;
         }
         return mKeyboardView;
+    }
+
+    public ClipboardHistoryPanel getClipboardHistoryPanel() {
+        return mClipboardHistoryPanel;
+    }
+
+    public boolean isShowingClipboardHistoryPanel() {
+        return mClipboardHistoryPanel != null
+                && mClipboardHistoryPanel.getVisibility() == View.VISIBLE;
+    }
+
+    public boolean showClipboardHistoryPanel() {
+        if (mKeyboardView == null || mClipboardHistoryPanel == null) {
+            return false;
+        }
+        int panelHeight = Math.max(mKeyboardView.getHeight(), mKeyboardView.getMeasuredHeight());
+        if (panelHeight > 0) {
+            final ViewGroup.LayoutParams params = mClipboardHistoryPanel.getLayoutParams();
+            params.height = panelHeight;
+            mClipboardHistoryPanel.setLayoutParams(params);
+        }
+        mKeyboardView.setVisibility(View.GONE);
+        mClipboardHistoryPanel.setVisibility(View.VISIBLE);
+        mMainKeyboardFrame.requestLayout();
+        return true;
+    }
+
+    public void hideClipboardHistoryPanel() {
+        if (mClipboardHistoryPanel == null || mKeyboardView == null) {
+            return;
+        }
+        mClipboardHistoryPanel.setVisibility(View.GONE);
+        mKeyboardView.setVisibility(View.VISIBLE);
+        mMainKeyboardFrame.requestLayout();
     }
 
     public MainKeyboardView getMainKeyboardView() {
@@ -526,6 +569,7 @@ public final class KeyboardSwitcher implements KeyboardState.SwitchActions {
                 R.id.emoji_palettes_view);
 
         mKeyboardView = (MainKeyboardView) mCurrentInputView.findViewById(R.id.keyboard_view);
+        mClipboardHistoryPanel = mCurrentInputView.findViewById(R.id.clipboard_history_panel);
         mKeyboardView.setHardwareAcceleratedDrawingEnabled(isHardwareAcceleratedDrawingEnabled);
         mKeyboardView.setKeyboardActionListener(mLatinIME);
         mEmojiPalettesView.setHardwareAcceleratedDrawingEnabled(

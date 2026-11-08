@@ -493,6 +493,10 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="clipboard_history_summary">While this keyboard is open, keep up to 50 plain-text clips on this device. Unpinned items expire after 7 days; password fields, personalization opt-out fields, and clips marked sensitive are excluded.</string>
     <string name="clipboard_history_title">Clipboard history</string>
     <string name="clipboard_history_empty">No copied text yet</string>
+    <string name="clipboard_history_empty_pinned">No pinned clips yet</string>
+    <string name="clipboard_history_recent">Recent</string>
+    <string name="clipboard_history_pinned">Pinned</string>
+    <string name="clipboard_history_back">Back to keyboard</string>
     <string name="clipboard_history_clear">Clear history</string>
     <string name="clipboard_history_clear_confirmation">Delete all saved clipboard text? This cannot be undone.</string>
     <string name="clipboard_history_pin">Pin</string>
@@ -500,6 +504,7 @@ mobile devices. [CHAR LIMIT=25] -->
     <string name="clipboard_history_delete">Delete</string>
     <string name="clipboard_history_button_description">Open clipboard history</string>
     <string name="clipboard_suggestion_accessibility">Copied text: %1$s. Tap to paste. The close control dismisses this suggestion.</string>
+    <string name="clipboard_suggestion_dismiss">Dismiss copied-text suggestion</string>
     <!-- Message about some dictionary indicating it can be downloaded, but hasn't been yet -->
     <string name="dictionary_available">Dictionary available</string>
     <!-- Message about some dictionary indicating it is downloading and should be available soon -->

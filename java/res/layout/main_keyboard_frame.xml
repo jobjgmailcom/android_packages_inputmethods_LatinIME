@@ -43,6 +43,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <com.android.inputmethod.latin.ClipboardHistoryPanel
+        android:id="@+id/clipboard_history_panel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
+
     <FrameLayout
         android:id="@+id/floating_drag_handle"
         android:layout_width="match_parent"

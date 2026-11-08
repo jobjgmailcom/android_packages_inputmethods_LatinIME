@@ -236,6 +236,10 @@
     <string name="clipboard_history_summary">Mientras el teclado esté abierto, guardar hasta 50 textos en este dispositivo. Los no fijados caducan a los 7 días; se excluyen campos de contraseña o sin personalización y clips marcados como sensibles.</string>
     <string name="clipboard_history_title">Historial del portapapeles</string>
     <string name="clipboard_history_empty">Todavía no hay texto copiado</string>
+    <string name="clipboard_history_empty_pinned">Todavía no hay textos fijados</string>
+    <string name="clipboard_history_recent">Recientes</string>
+    <string name="clipboard_history_pinned">Fijados</string>
+    <string name="clipboard_history_back">Volver al teclado</string>
     <string name="clipboard_history_clear">Borrar historial</string>
     <string name="clipboard_history_clear_confirmation">¿Borrar todo el texto guardado del portapapeles? Esta acción no se puede deshacer.</string>
     <string name="clipboard_history_pin">Fijar</string>
@@ -243,6 +247,7 @@
     <string name="clipboard_history_delete">Eliminar</string>
     <string name="clipboard_history_button_description">Abrir historial del portapapeles</string>
     <string name="clipboard_suggestion_accessibility">Texto copiado: %1$s. Toca para pegar. El control de cerrar descarta esta sugerencia.</string>
+    <string name="clipboard_suggestion_dismiss">Descartar sugerencia de texto copiado</string>
     <string name="prefs_keyboard_height_scale_summary">Ajusta la altura del teclado del 50 % al 150 %</string>
     <string name="prioritize_learned_words">Priorizar palabras personales y aprendidas</string>
     <string name="prioritize_learned_words_summary">Dar más prioridad a palabras personales y aprendidas al sugerir la siguiente palabra</string>

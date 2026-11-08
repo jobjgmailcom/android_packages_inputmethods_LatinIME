@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/clipboard_suggestion_capsule"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="4dp"
+    android:paddingEnd="4dp"
+    android:hapticFeedbackEnabled="false"
+    android:soundEffectsEnabled="false">
+
+    <TextView
+        android:id="@+id/clipboard_suggestion_text"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:drawablePadding="6dp"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingStart="10dp"
+        android:paddingEnd="4dp"
+        android:singleLine="true"
+        android:textStyle="bold"
+        style="?attr/suggestionWordStyle" />
+
+    <ImageButton
+        android:id="@+id/clipboard_suggestion_close"
+        android:layout_width="36dp"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/clipboard_suggestion_dismiss"
+        android:padding="7dp"
+        android:scaleType="fitCenter" />
+</LinearLayout>
